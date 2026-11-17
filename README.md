@@ -56,13 +56,17 @@ adb shell ls /sys/kernel/tracing/events/kmem/kmem_cache_alloc
 
 PowerShell 同理，用双引号或直接不加引号。
 
-| 项 | 期望 |
-|----|------|
-| `perf_event_paranoid` | `-1`（GKI 默认常为 2/3） |
-| `/proc/slabinfo` | 可读（常见是 `0400 root`，不可读） |
-| `tracefs` 的 `kmem/kmem_cache_alloc` | 可见 |
+| 项 | 期望 | A16 `W3WWL36.65-48-7` 实测 |
+|----|------|------------------------------|
+| `perf_event_paranoid` | `-1` | ✅ `-1` |
+| `/proc/slabinfo` | 可读 | ✅ 可读 |
+| `tracefs` 的 `kmem/kmem_cache_alloc` | 可见 | ✅ `enable filter format hist id trigger` |
+| `trace_pipe` 可读 | shell 在 `readtracefs` 组 | ⚠️ 待确认（`adb shell id` 里要有 `readtracefs`） |
 
-若这三条不满足，本工具在你这台机器上无效。
+一键体检脚本：[`tools-scripts/avr-probe.bat`](tools-scripts/avr-probe.bat)（Windows cmd）
+/ [`avr-probe.sh`](tools-scripts/avr-probe.sh)（WSL/Git Bash），全程只读。
+
+若这几条不满足，本工具在你这台机器上无效。
 
 ---
 
@@ -90,6 +94,8 @@ push 到 `main` 就会触发 [`.github/workflows/build.yml`](.github/workflows/b
 2. **用 NDK 重新编译两个 payload**（`exploit/build.sh`）→ `app/src/main/jniLibs/arm64-v8a/`
 3. `./gradlew assembleRelease` 出 APK
 4. 上传 artifact `AvrRoot-apk`，并在 push 时创建 prerelease
+
+CI 还会产出 `AvrRoot-tools` artifact，里面有 `taskleak`（实测 `TASK_ALLOC_BYTES` 用）。
 
 > 仓库里**不再提交**编译好的 `.so`。偏移是编译期常量，必须由 CI 从
 > `exploit/src/devices/avr-cn-a16|a17/offsets.h` 现场编出来 —— 用别人机器编的 `.so`
