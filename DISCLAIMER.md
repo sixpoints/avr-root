@@ -3,6 +3,9 @@
 This project is provided for **security research, education, and repair of
 devices you own**.
 
+Target: Lenovo Legion Y70 (2025) / moto edge 70 max, `XT2611`, codename `avr`, builds
+`W3WWL36.65-48-7` (Android 16) and `A171WWH.42-35-16` (Android 17).
+
 - **Only run it on hardware you own or are explicitly authorized to test.**
   Using it against devices you do not own is illegal in most jurisdictions.
 - **Temporary root is not persistent.** It exists only for the current boot and

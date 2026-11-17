@@ -1,4 +1,4 @@
-package com.puddingroot;
+package com.avrroot;
 
 import android.Manifest;
 import android.app.Activity;
@@ -31,17 +31,14 @@ import rikka.shizuku.Shizuku;
 
 public class MainActivity extends Activity {
 
-    /** Kernel prefix for the supported build (HyperOS 4.0.1.0.XPCMIXM.D01). */
-    static final String EXPECT_KERNEL_PREFIX = "6.12.69-android16-6-g0a1dc0413ec7";
-    /** Build id is set at boot and is NOT spoofable by KernelSU. */
-    static final String EXPECT_BUILD = "4.0.1.0";
+    /** 本 fork 适配的两个内核（avr = 联想 Y70 新一代 / moto edge 70 max, XT2611） */
+    static final String EXPECT_KERNEL_A16 =
+            "6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k";   // W3WWL36.65-48-7
+    static final String EXPECT_KERNEL_A17 =
+            "6.12.58-android16-6-g09eda8c8505a-ab15950084-4k";   // A171WWH.42-35-16
 
-    /** Kernel the active GLOBAL payload was built against (pudding-global offsets). */
-    static final String EXPECT_KERNEL_GLOBAL =
-            "6.12.69-android16-6-g0a1dc0413ec7-ab16271006-4k";
-    /** Kernel the active CN payload was built against (pudding offsets). */
-    static final String EXPECT_KERNEL_CN =
-            "6.12.69-android16-6-g43b5ab7e247d-abogki561813157-4k";
+    /** 已适配的 build id（开机设置，KernelSU 无法伪造） */
+    static final String[] EXPECT_BUILDS = {"W3WWL36.65-48-7", "A171WWH.42-35-16"};
 
     private TextView statusView;
     private TextView logView;
@@ -131,9 +128,9 @@ public class MainActivity extends Activity {
 
         refreshStatus();
         if (deviceStatus() != 0) {
-            appendLog("Note: this build is not verified (target: pudding HyperOS 4, "
-                    + "global 4.0.1.0 / CN). Running may fail or crash the kernel — "
-                    + "proceed at your own risk.");
+            appendLog("Note: this build is not verified (target: avr / XT2611, "
+                    + "builds W3WWL36.65-48-7 or A171WWH.42-35-16). Running may "
+                    + "fail or crash the kernel — proceed at your own risk.");
         }
         int km = kernelMatch();
         if (km == 1) {
@@ -217,15 +214,15 @@ public class MainActivity extends Activity {
         return best != null ? best : "?";
     }
 
-    /** Kernel the currently-selected payload was compiled against. */
+    /** 当前生效 payload 对应的内核串。 */
     private String expectedKernel() {
-        return isCnBuild() ? EXPECT_KERNEL_CN : EXPECT_KERNEL_GLOBAL;
+        return isA17Build() ? EXPECT_KERNEL_A17 : EXPECT_KERNEL_A16;
     }
 
-    /** CN vs global payload selection, mirrors RootRunner.isCnBuild(). */
-    private boolean isCnBuild() {
+    /** 是不是 Android 17 那条 build（A171WWH.42-35-16）。 */
+    private boolean isA17Build() {
         for (String s : buildSources()) {
-            if (s != null && s.contains("CNXM")) {
+            if (s != null && s.contains("A171WWH")) {
                 return true;
             }
         }
@@ -233,14 +230,11 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Does the device kernel match the payload's offsets?
-     * 0 = match, 1 = mismatch, 2 = unreadable.
+     * 设备内核是否与 payload 的偏移匹配？
+     * 0 = 匹配, 1 = 不匹配, 2 = 读不到。
      *
-     * The exploit's kallsyms addresses and call-site values are compile-time
-     * constants baked into the native payload, so a kernel string mismatch
-     * means the offsets will not line up -- the write will miss, or hit the
-     * wrong address and panic. A match is a strong positive signal; it is not
-     * a guarantee, since two builds can share a release string but differ.
+     * exploit 的 kallsyms 地址与 call-site 常量是编译期烧进 native payload 的，
+     * 内核串对不上就意味着偏移对不上 —— 写会打偏，或者打到别处直接 panic。
      */
     private int kernelMatch() {
         String live = kernelVersion();
@@ -251,45 +245,28 @@ public class MainActivity extends Activity {
         return live.equals(expected) ? 0 : 1;
     }
 
-    /** 0 = verified build, 1 = experimental (pudding/HyperOS 4), 2 = unsupported. */
+    /** 0 = 已验证 build, 1 = avr 但 build 未验证, 2 = 非 avr 设备。 */
     private int deviceStatus() {
-        if (isVerifiedBuild()) {
-            return 0;
+        if (!isAvrDevice()) {
+            return 2;
         }
-        if (isPuddingFamily()) {
-            return 1;
-        }
-        return 2;
+        return isVerifiedBuild() ? 0 : 1;
     }
 
-    private boolean isPuddingFamily() {
-        return isPuddingDevice() && isHyperOs4();
-    }
-
-    /** Global 4.0.1.0 (verified on hardware) or China CN (Dream-Rainy verified). */
+    /** build id 是否在已适配列表里。 */
     private boolean isVerifiedBuild() {
-        if (!isPuddingDevice()) {
-            return false;
-        }
-        for (String s : buildSources()) {
-            if (s != null && (s.contains(EXPECT_BUILD) || s.contains("CNXM"))) {
-                return true;
+        for (String want : EXPECT_BUILDS) {
+            for (String s : buildSources()) {
+                if (s != null && s.contains(want)) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    private boolean isPuddingDevice() {
-        return Build.DEVICE != null && Build.DEVICE.toLowerCase().contains("pudding");
-    }
-
-    private boolean isHyperOs4() {
-        for (String s : buildSources()) {
-            if (s != null && s.startsWith("OS4")) {
-                return true;
-            }
-        }
-        return false;
+    private boolean isAvrDevice() {
+        return Build.DEVICE != null && Build.DEVICE.toLowerCase().contains("avr");
     }
 
     private String[] buildSources() {
@@ -301,11 +278,13 @@ public class MainActivity extends Activity {
         };
     }
 
-    /** The Xiaomi/HyperOS build string for display (prefer one containing "OS"). */
+    /** 用于显示的 build 串（优先命中已适配 build id 的那个）。 */
     private String xiaomiBuild() {
-        for (String s : buildSources()) {
-            if (s != null && (s.contains("OS4") || s.contains("XM"))) {
-                return s;
+        for (String want : EXPECT_BUILDS) {
+            for (String s : buildSources()) {
+                if (s != null && s.contains(want)) {
+                    return s;
+                }
             }
         }
         return Build.DISPLAY != null ? Build.DISPLAY : "?";
@@ -396,9 +375,9 @@ public class MainActivity extends Activity {
             shizuku = "Shizuku: unavailable (" + t.getClass().getSimpleName() + ")";
         }
 
-        String target = st == 0 ? "VERIFIED BUILD (global / CN)"
-                : st == 1 ? "EXPERIMENTAL (unverified build)"
-                : "UNSUPPORTED (not Xiaomi 17 / HyperOS 4)";
+        String target = st == 0 ? "VERIFIED BUILD (avr / XT2611)"
+                : st == 1 ? "EXPERIMENTAL (avr, build not in the adapted list)"
+                : "UNSUPPORTED (not an avr device)";
         boolean ksuLoaded = isKsuLoaded();
         if (ksuLoaded) {
             rooted = true;
@@ -619,7 +598,7 @@ public class MainActivity extends Activity {
             @Override
             public void onDone(boolean ok, String summary) {
                 Notifier.notify(MainActivity.this,
-                        ok ? "PuddingRoot: rooted" : "PuddingRoot: failed",
+                        ok ? "AvrRoot: rooted" : "AvrRoot: failed",
                         ok ? summary : summary + " Reboot and retry.",
                         Notifier.ID_AUTO);
                 ui.post(() -> {
@@ -643,7 +622,7 @@ public class MainActivity extends Activity {
 
     private void copyLog() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("PuddingRoot log", logView.getText()));
+        clipboard.setPrimaryClip(ClipData.newPlainText("AvrRoot log", logView.getText()));
         toast("Log copied");
     }
 

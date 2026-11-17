@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PuddingRoot"
+rootProject.name = "AvrRoot"
 include(":app")

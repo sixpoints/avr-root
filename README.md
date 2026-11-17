@@ -1,134 +1,125 @@
-# PuddingRoot
+# AvrRoot
 
-One-tap **temporary root** for the **Xiaomi 17 (`pudding`)** on **HyperOS 4**
-(Android 17), supporting the **Global** and **China (CN)** builds.
+一键 **临时 root**，面向 **联想拯救者手机 Y70 新一代 / moto edge 70 max**
+（`XT2611-1` / `XT2611-2`，codename **`avr`**，SM8845）。
 
-The app drives [Shizuku](https://github.com/RikkaApps/Shizuku) in shell mode,
-runs the [CVE-2026-98260](https://github.com/Dream-Rainy/CVE-2026-98260)
-local-privilege-escalation payload, and loads the installed **KernelSU /
-KernelSU-Next / SukiSU / ReSukiSU** manager's kernel module via `ksud
-late-load`.
+基于 [CVE-2026-98260](https://github.com/YuKongA/CVE-2026-98260)（POSIX CPU timer UAF），
+移植自 [Dream-Rainy/CVE-2026-98260](https://github.com/Dream-Rainy/CVE-2026-98260) 与
+[cramqin/pudding-root](https://github.com/cramqin/pudding-root)。
 
-No PC, no unlocked bootloader, no partition changes. **Boot-only** — a reboot
-removes it, and you re-run the app.
+> **临时 root**：只存在于当前这一次开机，**重启即消失**。不解锁 bootloader、不修改任何分区、
+> 重启后 Play Integrity 恢复正常。
 
-> Research / education / device-repair project. Only run it on devices you own.
-> Read [`DISCLAIMER.md`](DISCLAIMER.md) first.
+---
 
-## Supported devices
+## 支持的 build
 
-| build | firmware | kernel | status |
-|---|---|---|---|
-| Global | HyperOS `4.0.1.0.XPCMIXM.D01` | `6.12.69-android16-6-g0a1dc0413ec7-ab16271006-4k` | verified on hardware |
-| Global | HyperOS `4.0.3.0.XPCMIXM` | `6.12.69-android16-6-g0a1dc0413ec7-ab16271006-4k` | verified on hardware |
-| China (CN) | HyperOS `4.0.0.9.XPCCNXM` | `6.12.69-android16-6-gb1493ec68d4a-abogki514973465-4k` | verified upstream (Dream-Rainy) |
+内核串必须**完全一致**（`uname -r`），否则应用会拒绝运行 —— exploit 的 kallsyms 地址
+与 call-site 常量是编译期烧进 payload 的，对不上就会写偏甚至 panic。
 
-The app auto-selects the matching payload from the build region (CN vs global)
-and treats **any** Xiaomi 17 on HyperOS 4 (`4.0.0.0` and above) as an
-experimental target rather than hard-blocking it. The exploit offsets are
-build-specific — running an unverified build can fail or panic the kernel.
+| payload | build id | Android | kernel release |
+|---------|----------|---------|----------------|
+| `libtimer-a16.so` | `W3WWL36.65-48-7` | 16 | `6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k` |
+| `libtimer-a17.so` | `A171WWH.42-35-16` | 17 | `6.12.58-android16-6-g09eda8c8505a-ab15950084-4k` |
 
-### Boot Image Checker
+两个 build 的偏移完全不同（kallsyms、`do_timer_create` / `copy_process` 的 call-site 都变了），
+应用按 `Build.ID` 自动选 payload。
 
-A **Boot Image Checker** activity (open it from the main screen) lets you
-verify whether a given `boot.img` matches the exploit offsets **before** you
-run anything. It is read-only, offline, and safe — it only parses the selected
-file, never touches the running kernel.
+### 这套偏移是怎么来的
 
-- **Global builds** (`XPCMIXM`): verified against `4.0.1.0` and `4.0.3.0`
-  boot images — both report **PASS**.
-- **CN builds** (`XPCCNXM`): verified against `4.0.0.9` — reports **PASS**.
+全部从本机 `boot.img` 推导，没有照抄别的机型（规则见上游 README §7.3）：
 
-The checker inspects the two `bl` call-site instructions that the exploit
-relies on (`do_timer_create` → `kmem_cache_alloc_noprof` and `copy_process`
-→ `kmem_cache_alloc_node_noprof`) and reports which profile matched, if any.
-A mismatch means the offsets won't line up — do not run; extract this build's
-offsets first (see `exploit/src/devices/`).
+| 常量 | 来源 |
+|------|------|
+| `STATIC_TIMER_SITE` / `TIMER_SITE_LOW21` | `do_timer_create` 里 `bl kmem_cache_alloc_noprof` 的返回地址（前置 `adrp`/`ldr` 已核对指向 `posix_timers_cache`，`w1=0xdc0`） |
+| `COPY_PROCESS_LOW21` | `copy_process`（`dup_task_struct`）里 `bl kmem_cache_alloc_node_noprof` 的返回地址（已核对指向 `task_struct_cachep`） |
+| `*_STATIC` | 同一镜像的 kallsyms |
+| `cred` / `task_struct` / `k_itimer` 结构常量 | 同一镜像的内嵌 BTF（`cred=0xb8`、`task_struct.cred=0x900`、`k_itimer=0x100`，与 6.12 GKI 一致） |
+| `TASK_ALLOC_BYTES` | 未实测，初值 `0x1840`；`scan_task_allocs()` 接受 `0x1440/0x1640/0x1840` |
 
-## Requirements
+---
 
-1. **Shizuku** (or a Shizuku-compatible fork) running in shell mode, with this
-   app granted permission. `moe.shizuku.privileged.api` must be the provider.
-2. A **KernelSU-family manager** installed (KernelSU / KernelSU-Next / SukiSU /
-   ReSukiSU, including package-name-spoofed builds). Its bundled `libksud.so` is
-   used for the late-load.
-3. USB debugging is *not* required; Shizuku can be started via wireless
-   debugging on-device.
+## ⚠️ 先查前置条件（不满足就别装）
 
-## Usage
+这个 exploit 依赖 **tracefs** 与 `/proc/slabinfo` 的可读性。**不满足就跑不起来**，
+不是复现步骤的问题。
 
-1. Start Shizuku, grant this app permission.
-2. Pick your installed manager in the **Root Manager** selector (it auto-detects
-   installed KernelSU-family managers; **Custom** lets you type a spoofed
-   package name).
-3. Tap **Root (KernelSU)** and wait ~1–3 minutes.
-4. Success shows `KSU_LOADED`. Verify with `adb shell su -c id`
-   (expect `context=u:r:ksu:s0`).
+Windows `cmd` 下**不要**用单引号包命令（`adb shell 'cat ...'` 会把整串当成一条命令名，
+报 `...: inaccessible or not found`，那是"命令没跑起来"，不是"权限不足"）：
 
-The reclaim is **probabilistic**. If a run ends with `parking` / "reclaim
-missed", **reboot the device** and tap Root again. Never kill a parked run and
-never re-run on the same boot after a park.
-
-After a successful run the exploit now **exits cleanly** (releases its spray
-memory) instead of parking. A **Soft reboot** button then appears (only when
-rooted) — it opens your KernelSU manager, which has a working soft-reboot option
-that restarts the framework while keeping the loaded LKM, so root survives it. A
-full **Reboot** drops the LKM and you must re-root.
-
-> Note: once KernelSU is loaded (jailbreak mode), it spoofs the kernel version
-> string; the app therefore identifies the device by its build ID, not `uname`.
-
-> Quirk: while the exploit's kernel state / KernelSU LKM is loaded, a normal
-> **power-off may reboot instead of turning off** (the shutdown path can trip the
-> exploit's residual kernel state, or the LKM's hooks). Use the app's **Reboot**
-> button to return to a clean state; power-off works normally once you've
-> rebooted (root is boot-only).
-
-## Build
-
-### GitHub Actions (recommended)
-
-Push to `main`; one push both builds the APK **and** publishes a GitHub
-release. The version comes from [`version.txt`](version.txt) — bump it (e.g.
-`1.0.0`) before pushing a new release.
-
-The workflow uploads the APK as the `PuddingRoot-apk` artifact and creates a
-release (`v<version>`) with the APK attached.
-
-Releases are signed with a committed keystore (`keystore.p12`), so new versions
-install over the previous one. Rotate the key (and move it to a secret) before
-making the repo public.
-
-### Local
-
-```sh
-./gradlew assembleRelease
+```bat
+adb shell id
+adb shell cat /proc/sys/kernel/perf_event_paranoid
+adb shell head -2 /proc/slabinfo
+adb shell ls /sys/kernel/tracing/events/kmem/kmem_cache_alloc
 ```
 
-Requires JDK 17 and the Android SDK (platform 34, build-tools 34.0.0).
+PowerShell 同理，用双引号或直接不加引号。
 
-## How it works
+| 项 | 期望 |
+|----|------|
+| `perf_event_paranoid` | `-1`（GKI 默认常为 2/3） |
+| `/proc/slabinfo` | 可读（常见是 `0400 root`，不可读） |
+| `tracefs` 的 `kmem/kmem_cache_alloc` | 可见 |
 
-1. The app copies its bundled payload (`libtimer.so` for global or
-   `libtimer-cn.so` for China, both static aarch64 ELFs) into
-   `/data/local/tmp/a/ptimer` through Shizuku's shell context.
-2. The payload runs in `u:r:shell:s0` (`uid=2000`) and exploits CVE-2026-98260
-   (POSIX CPU timer UAF → `rb_erase` 8-byte zero-write).
-3. It forges a `cred` with `uid=0` + full caps, then runs
-   `ksud late-load --kmi android16-6.12 --package-name <your manager>`, which
-   loads the matching KernelSU LKM and restores SELinux enforcing.
+若这三条不满足，本工具在你这台机器上无效。
 
-The manager package is passed via the `KSU_PKG` environment variable, so the
-same binary works with stock/spoofed managers. See
-[`exploit/`](exploit) for the payload source and [`exploit/build.sh`](exploit/build.sh)
-to rebuild both binaries.
+---
 
-## Credits
+## 用法
 
-- Exploit: [Dream-Rainy/CVE-2026-98260](https://github.com/Dream-Rainy/CVE-2026-98260),
-  derived from [YuKongA/CVE-2026-98260](https://github.com/YuKongA/CVE-2026-98260).
-- Architecture reference: [zsw125/o3root](https://github.com/zsw125/o3root)
-  (Shizuku shell → CVE-2026-98260 → KernelSU LKM).
-- Shizuku: [RikkaApps/Shizuku](https://github.com/RikkaApps/Shizuku).
+1. 装一个自带 `libksud.so` 的 root 管理器（KernelSU / KernelSU-Next / SukiSU Ultra /
+   ReSukiSU / BakaSU / KowSU）。
+2. 装 `AvrRoot-<version>.apk`。
+3. 打开应用，确认顶部状态是 `VERIFIED BUILD (avr / XT2611)`、且 `kernel matches payload offsets`。
+4. 点 **执行**。跑的是 `timer fake -d`（伪造 cred + `ksud late-load`）。
+5. 概率性成功：失败就重启再来。**不要**在同一个 boot 里重跑。
 
-No license is claimed over the derived exploit code; see the upstream projects.
+想先安全地验证移植是否对得上，可以用 `BootimgCheckerActivity`（应用内"检查 boot.img"）：
+选一个本机的 `boot.img`，它会在两个 `bl` 位置校验指令编码。PASS 说明 call-site 常量正确。
+
+---
+
+## 构建
+
+### CI（推荐）
+
+push 到 `main` 就会触发 [`.github/workflows/build.yml`](.github/workflows/build.yml)：
+
+1. 装 Android SDK + NDK
+2. **用 NDK 重新编译两个 payload**（`exploit/build.sh`）→ `app/src/main/jniLibs/arm64-v8a/`
+3. `./gradlew assembleRelease` 出 APK
+4. 上传 artifact `AvrRoot-apk`，并在 push 时创建 prerelease
+
+> 仓库里**不再提交**编译好的 `.so`。偏移是编译期常量，必须由 CI 从
+> `exploit/src/devices/avr-cn-a16|a17/offsets.h` 现场编出来 —— 用别人机器编的 `.so`
+> 会写错地址。
+
+### 本地
+
+```sh
+# 需要 NDK r27+
+CC=$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang \
+TARGET=aarch64-linux-android31 bash exploit/build.sh
+
+./gradlew assembleRelease     # 产物: app/build/outputs/apk/release/
+```
+
+`keystore.p12` 与默认口令沿用上游（`puddingroot`），所以连续构建可以覆盖安装。
+**公开仓库前请换成自己的签名并改用 Secrets**。
+
+---
+
+## 致谢
+
+- exploit 本体：[YuKongA/CVE-2026-98260](https://github.com/YuKongA/CVE-2026-98260)
+- 设备移植与工程化：[Dream-Rainy/CVE-2026-98260](https://github.com/Dream-Rainy/CVE-2026-98260)
+- Android 外壳 / CI：[cramqin/pudding-root](https://github.com/cramqin/pudding-root)
+- 其他参考见 [`exploit/ATTRIBUTION.md`](exploit/ATTRIBUTION.md)
+
+上游未声明许可证，本仓库同样不对派生代码主张任何许可证。
+
+## 免责
+
+见 [DISCLAIMER.md](DISCLAIMER.md)。只在你拥有的设备上使用；内核内存会被故意破坏，
+失败可能 panic / 重启 / 数据丢失。

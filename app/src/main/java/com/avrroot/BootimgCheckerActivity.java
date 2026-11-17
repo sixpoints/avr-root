@@ -1,4 +1,4 @@
-package com.puddingroot;
+package com.avrroot;
 
 import android.app.Activity;
 import android.content.ClipData;
@@ -161,22 +161,22 @@ public class BootimgCheckerActivity extends Activity {
                     }
 
                     updateProgress(80, "Checking call-site offsets…");
-                    // Check the two call sites. Try CN offsets first if image looks like CN,
-                    // or just check both.
-                    boolean ok1_global = checkCallSite(kernel, 0xffffffc08035477cL, "do_timer_create (global)");
-                    boolean ok2_global = checkCallSite(kernel, 0xffffffc0800f42d8L, "copy_process (global)");
+                    // 两组 avr call-site 都试：A16 (W3WWL36.65-48-7) 与 A17 (A171WWH.42-35-16)
+                    boolean ok1_a16 = checkCallSite(kernel, 0xffffffc0805180a4L, "do_timer_create (avr A16)");
+                    boolean ok2_a16 = checkCallSite(kernel, 0xffffffc080156c70L, "copy_process (avr A16)");
 
-                    boolean ok1_cn = checkCallSite(kernel, 0xffffffc0801f9338L, "do_timer_create (cn)");
-                    boolean ok2_cn = checkCallSite(kernel, 0xffffffc0800ddadcL, "copy_process (cn)");
+                    boolean ok1_a17 = checkCallSite(kernel, 0xffffffc080517744L, "do_timer_create (avr A17)");
+                    boolean ok2_a17 = checkCallSite(kernel, 0xffffffc0801d7440L, "copy_process (avr A17)");
 
-                    boolean ok_global = ok1_global && ok2_global;
-                    boolean ok_cn = ok1_cn && ok2_cn;
+                    boolean ok_a16 = ok1_a16 && ok2_a16;
+                    boolean ok_a17 = ok1_a17 && ok2_a17;
 
                     updateProgress(100, "Done");
                     ui.post(() -> {
-                        if (ok_global || ok_cn) {
-                            String type = ok_cn ? "CN" : "Global";
-                            statusView.setText("✓ PASS — " + type + " offsets match");
+                        if (ok_a16 || ok_a17) {
+                            String type = ok_a17 ? "A17 (A171WWH.42-35-16)"
+                                                 : "A16 (W3WWL36.65-48-7)";
+                            statusView.setText("✓ PASS — " + type);
                             appendLog("RESULT: ✓ PASS — " + type + " call sites match the exploit offsets");
                         } else {
                             statusView.setText("✗ FAIL — offsets do not match");
@@ -255,7 +255,7 @@ public class BootimgCheckerActivity extends Activity {
     }
 
     private byte[] decompressXz(byte[] data) throws IOException {
-        throw new IOException("XZ decompression not implemented (not needed for pudding)");
+        throw new IOException("XZ decompression not implemented (not needed for avr)");
     }
 
     private void toast(String s) {

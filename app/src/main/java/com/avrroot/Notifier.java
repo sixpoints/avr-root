@@ -1,4 +1,4 @@
-package com.puddingroot;
+package com.avrroot;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -11,7 +11,7 @@ import android.os.Build;
 
 public final class Notifier {
 
-    public static final String CHANNEL = "puddingroot";
+    public static final String CHANNEL = "avrroot";
     public static final int ID_AUTO = 1001;
 
     private Notifier() {
@@ -20,7 +20,7 @@ public final class Notifier {
     public static void ensureChannel(Context ctx) {
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
         NotificationChannel ch = new NotificationChannel(
-                CHANNEL, "PuddingRoot", NotificationManager.IMPORTANCE_HIGH);
+                CHANNEL, "AvrRoot", NotificationManager.IMPORTANCE_HIGH);
         nm.createNotificationChannel(ch);
     }
 

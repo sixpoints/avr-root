@@ -29,6 +29,28 @@ jobs:
           "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0" "platform-tools"
           echo "sdk.dir=$SDK_ROOT" > local.properties
 
+      # ---- 原生 payload：offsets 是编译期常量，必须按本仓库的 avr 头重新编译 ----
+      - name: Resolve NDK
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-}"
+          if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+            SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+            SDKMANAGER=$(ls "$SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+            "$SDKMANAGER" "ndk;27.2.12479018" || "$SDKMANAGER" "ndk;26.1.10909125"
+            NDK=$(ls -d "$SDK_ROOT"/ndk/* 2>/dev/null | sort -V | tail -1)
+          fi
+          test -d "$NDK" || { echo "NDK not found"; exit 1; }
+          echo "NDK_HOME=$NDK" >> "$GITHUB_ENV"
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" --version | head -1
+
+      - name: Build native payloads (libtimer-a16.so / libtimer-a17.so)
+        run: |
+          chmod +x exploit/build.sh
+          CC="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" \
+          TARGET=aarch64-linux-android31 \
+          bash exploit/build.sh
+          ls -la app/src/main/jniLibs/arm64-v8a/
+
       - name: Build release APK
         env:
           VERSION_CODE: ${{ github.run_number }}
@@ -39,7 +61,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PuddingRoot-apk
+          name: AvrRoot-apk
           path: app/build/outputs/apk/release/*.apk
 
       - name: Create prerelease
@@ -48,10 +70,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="$(cat version.txt)"
-          cp app/build/outputs/apk/release/app-release.apk "PuddingRoot-${VERSION}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "AvrRoot-${VERSION}.apk"
           gh release delete "v${VERSION}" --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
-          gh release create "v${VERSION}" "PuddingRoot-${VERSION}.apk" \
+          gh release create "v${VERSION}" "AvrRoot-${VERSION}.apk" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "PuddingRoot ${VERSION}" \
-            --notes "PuddingRoot beta ${VERSION}. Install only on the supported Xiaomi 17 Global build." \
+            --title "AvrRoot ${VERSION}" \
+            --notes "AvrRoot beta ${VERSION}. 仅适用于联想 Y70 新一代 / moto edge 70 max (XT2611, avr)：build W3WWL36.65-48-7 或 A171WWH.42-35-16。临时 root，重启即失效。" \
             --prerelease

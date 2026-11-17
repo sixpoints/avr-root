@@ -1,4 +1,4 @@
-package com.puddingroot;
+package com.avrroot;
 
 import android.content.Context;
 import android.os.Build;
@@ -73,20 +73,26 @@ public class RootRunner implements Runnable {
     }
 
     /** China (CN) builds use the CN offsets; global/EU/IN fall back to global. */
-    private static boolean isCnBuild() {
+    /**
+     * 按 build 选 payload：
+     *   A171WWH.* (Android 17) -> libtimer-a17.so
+     *   W3WWL*    (Android 16) -> libtimer-a16.so
+     * 两者偏移不同（kallsyms / call-site 都变了），选错会写偏并 panic。
+     */
+    private static String payloadLib() {
         String[] sources = {Build.ID, Build.DISPLAY, Build.FINGERPRINT};
         for (String s : sources) {
-            if (s != null && s.contains("CNXM")) {
-                return true;
+            if (s != null && s.contains("A171WWH")) {
+                return "libtimer-a17.so";
             }
         }
-        return false;
+        return "libtimer-a16.so";
     }
 
     @Override
     public void run() {
         try {
-            String libName = isCnBuild() ? "libtimer-cn.so" : "libtimer.so";
+            String libName = payloadLib();
             String lib = ctx.getApplicationInfo().nativeLibraryDir + "/" + libName;
             String tmp = "/data/local/tmp/a/ptimer";
             String launch = "export PATH=/system/bin:/system/xbin:/sbin; "
