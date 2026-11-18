@@ -61,7 +61,8 @@ PowerShell 同理，用双引号或直接不加引号。
 | `perf_event_paranoid` | `-1` | ✅ `-1` |
 | `/proc/slabinfo` | 可读 | ✅ 可读 |
 | `tracefs` 的 `kmem/kmem_cache_alloc` | 可见 | ✅ `enable filter format hist id trigger` |
-| `trace_pipe` 可读 | shell 在 `readtracefs` 组 | ⚠️ 待确认（`adb shell id` 里要有 `readtracefs`） |
+| `trace_pipe` 可读 | shell 在 `readtracefs` 组 | ✅ A16 / A17 都在组里 |
+| **tracefs 可写** | 能写 `events/…/enable`、`tracing_on` | ❌ **A17 实测不行（只有只读组）—— 这条不满足 exploit 就跑不起来** |
 
 一键体检脚本：[`tools-scripts/avr-probe.bat`](tools-scripts/avr-probe.bat)（Windows cmd）
 / [`avr-probe.sh`](tools-scripts/avr-probe.sh)（WSL/Git Bash），全程只读。

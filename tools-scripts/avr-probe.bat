@@ -78,8 +78,19 @@ echo ==================== [9] 现有 payload / 日志残留 ====================
 type %OUT%\09_leftover.txt
 
 echo.
+echo ==================== [10] tracefs 写权限（真正决定 exploit 能不能跑）====================
+REM exploit 要写 events/kmem/rss_stat/trigger、tracing_on、buffer_size_kb。
+REM shell 通常只有 readtracefs 只读组 —— 读得到不等于写得进。
+%ADB% shell "echo 0 > /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable 2>/dev/null && echo W_OK || echo W_FAIL" > %OUT%\10_tracefs_write.txt 2>&1
+%ADB% shell "v=$(cat /sys/kernel/tracing/tracing_on 2>/dev/null); echo $v > /sys/kernel/tracing/tracing_on 2>/dev/null && echo T_OK || echo T_FAIL" >> %OUT%\10_tracefs_write.txt 2>&1
+%ADB% shell "head -c 0 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw >/dev/null 2>&1 && echo R_OK || echo R_FAIL" >> %OUT%\10_tracefs_write.txt 2>&1
+%ADB% shell "ls -l /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable" >> %OUT%\10_tracefs_write.txt 2>&1
+type %OUT%\10_tracefs_write.txt
+echo   W_OK=能写（可用） / W_FAIL=不能写（exploit 跑不起来）
+
+echo.
 echo ================================================================
-echo  结果已保存在 %OUT%\   （共 10 个 txt，直接打包发我）
+echo  结果已保存在 %OUT%\   （共 11 个 txt，直接打包发我）
 echo  判定口径：
 echo    [1] id 里要能看到 readtracefs
 echo    [2] 必须是 6.12.58-android16-6-gb0a9599c6c01-ab14987696-4k

@@ -48,5 +48,15 @@ sed 's/^/  /' "$OUT/08_ksu.txt"
 say "[9] payload / 日志残留"
 run 09_leftover sh -c "\"$ADB\" shell 'ls -l /data/local/tmp/a/ 2>/dev/null; echo ---; tail -5 /data/local/tmp/timer.log 2>/dev/null'"
 
+say "[10] tracefs 写权限（决定 exploit 能不能跑）"
+{
+  "$ADB" shell "echo 0 > /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable 2>/dev/null && echo W_OK || echo W_FAIL"
+  "$ADB" shell "v=\$(cat /sys/kernel/tracing/tracing_on 2>/dev/null); echo \$v > /sys/kernel/tracing/tracing_on 2>/dev/null && echo T_OK || echo T_FAIL"
+  "$ADB" shell "head -c 0 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw >/dev/null 2>&1 && echo R_OK || echo R_FAIL"
+  "$ADB" shell ls -l /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable
+} >"$OUT/10_tracefs_write.txt" 2>&1
+sed 's/^/  /' "$OUT/10_tracefs_write.txt"
+echo "  W_OK=能写 / W_FAIL=不能写（exploit 跑不起来）"
+
 say "完成"
 echo "结果目录：$OUT/"
