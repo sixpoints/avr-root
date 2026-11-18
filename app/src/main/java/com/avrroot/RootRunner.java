@@ -111,15 +111,24 @@ public class RootRunner implements Runnable {
             return "读不到 /proc/slabinfo（SELinux 或权限限制）";
         }
 
-        // 写 enable=0：幂等，不会打开任何事件
-        r = sh("echo 0 > /sys/kernel/tracing/events/kmem/kmem_cache_alloc/enable "
-                + "2>/dev/null && echo W_OK || echo W_FAIL");
-        if (!r.contains("W_OK")) {
-            return "没有 tracefs 写权限（events/…/enable 写不进去）—— "
-                    + "shell 只有 readtracefs 只读组，本 exploit 无法运行";
+        // 关键一条：exploit 靠 events/kmem/rss_stat/trigger 打开 kmem 事件。
+        // 先 arm 再立刻 disarm，测完不留副作用。
+        r = sh("T=/sys/kernel/tracing/events/kmem/rss_stat/trigger; "
+                + "echo enable_event:kmem:kmem_cache_alloc > $T 2>/dev/null "
+                + "&& echo disable_event:kmem:kmem_cache_alloc > $T 2>/dev/null "
+                + "&& echo G_OK || echo G_FAIL");
+        if (!r.contains("G_OK")) {
+            return "写不进 events/kmem/rss_stat/trigger —— shell 没有 tracefs 写权限"
+                    + "（通常只有 readtracefs 只读组），本 exploit 无法运行";
         }
 
-        // 把 tracing_on 的当前值原样写回：校验能写顶层 tracing 文件
+        // 清 trace 缓冲（exploit 的 trace_start() 也会做），顺带验证 /trace 可写
+        r = sh("echo > /sys/kernel/tracing/trace 2>/dev/null && echo C_OK || echo C_FAIL");
+        if (!r.contains("C_OK")) {
+            return "写不进 /sys/kernel/tracing/trace（清缓冲失败）";
+        }
+
+        // tracing_on 写入当前值：幂等
         r = sh("v=$(cat /sys/kernel/tracing/tracing_on 2>/dev/null); "
                 + "echo $v > /sys/kernel/tracing/tracing_on 2>/dev/null "
                 + "&& echo T_OK || echo T_FAIL");
