@@ -62,7 +62,11 @@ PowerShell 同理，用双引号或直接不加引号。
 | `/proc/slabinfo` | 可读 | ✅ 可读 |
 | `tracefs` 的 `kmem/kmem_cache_alloc` | 可见 | ✅ `enable filter format hist id trigger` |
 | `trace_pipe` 可读 | shell 在 `readtracefs` 组 | ✅ A16 / A17 都在组里 |
-| **tracefs 可写** | 能写 `events/…/enable`、`tracing_on` | ❌ **A17 实测不行（只有只读组）—— 这条不满足 exploit 就跑不起来** |
+| **tracefs 可写** | 能写 `events/kmem/rss_stat/trigger`、`trace`、`tracing_on` | ✅ A16 / A17 实测都可写（这三个是 `-rw-rw-rw- root:readtracefs`） |
+
+> 注意别测错文件：`events/…/kmem_cache_alloc/enable` 是 `0644 root:root`，shell 写不了，
+> 但 **exploit 不用它** —— 它走的是 `events/kmem/rss_stat/trigger` 的 `enable_event:`
+> 机制，那个是 0666。`avr-probe` 与 App 内自检测的都是后者。
 
 一键体检脚本：[`tools-scripts/avr-probe.bat`](tools-scripts/avr-probe.bat)（Windows cmd）
 / [`avr-probe.sh`](tools-scripts/avr-probe.sh)（WSL/Git Bash），全程只读。
