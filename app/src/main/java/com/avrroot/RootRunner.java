@@ -72,7 +72,7 @@ public class RootRunner implements Runnable {
         return sh(command, new String[]{});
     }
 
-    /** China (CN) builds use the CN offsets; global/EU/IN fall back to global. */
+    /** 按内核串选择载荷：A17 用 a17 偏移，其余用 a16。 */
     /**
      * 按 build 选 payload：
      *   A171WWH.* (Android 17) -> libtimer-a17.so
@@ -101,10 +101,10 @@ public class RootRunner implements Runnable {
                     + " && cd /data/local/tmp"
                     + " && " + tmp + " fake -d";
 
-            sink.onLine("staging payload (" + libName + ")…");
+            sink.onLine("正在部署载荷 (" + libName + ")…");
             sh(launch, new String[]{"KSU_PKG=" + ksuPkg});
-            sink.onLine("exploit launched. watching timer.log (this is probabilistic; "
-                    + "if it misses, reboot and retry)…");
+            sink.onLine("exploit 已启动，正在跟踪 timer.log（成功有概率性，"
+                    + "没抓中请重启后再试）…");
 
             long deadline = System.currentTimeMillis() + TIMEOUT_MS;
             int lastLen = 0;
@@ -124,22 +124,22 @@ public class RootRunner implements Runnable {
                     }
                 }
                 if (log.contains("KSU_LOADED")) {
-                    sink.onDone(true, "SUCCESS: KernelSU loaded. Verify with: adb shell su -c id");
+                    sink.onDone(true, "成功：KernelSU 已加载。验证：adb shell su -c id");
                     return;
                 }
                 if (log.contains("ROOT_SHELL_OK")) {
-                    sink.onDone(true, "SUCCESS: uid=0 reached.");
+                    sink.onDone(true, "成功：已拿到 uid=0。");
                     return;
                 }
                 if (log.contains("parking") || log.contains("no successful plant")) {
                     sink.onDone(false,
-                            "FAILED (reclaim missed). Reboot the device, then tap Root again.");
+                            "失败（没抢到 slab 重占窗口）。请重启设备后再点一次提权。");
                     return;
                 }
             }
-            sink.onDone(false, "Timed out. Reboot and retry.");
+            sink.onDone(false, "超时。请重启后重试。");
         } catch (Throwable t) {
-            sink.onDone(false, "ERROR: " + t);
+            sink.onDone(false, "错误：" + t);
         }
     }
 }

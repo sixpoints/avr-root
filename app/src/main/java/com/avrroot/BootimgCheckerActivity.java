@@ -55,7 +55,7 @@ public class BootimgCheckerActivity extends Activity {
     private void copyLog() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         clipboard.setPrimaryClip(ClipData.newPlainText("Boot Image Check log", logView.getText()));
-        toast("Log copied");
+        toast("日志已复制");
     }
 
     private void clearLog() {
@@ -91,12 +91,12 @@ public class BootimgCheckerActivity extends Activity {
             progress.setVisibility(android.view.View.VISIBLE);
             progress.setProgress(0);
             statusView.setVisibility(android.view.View.VISIBLE);
-            statusView.setText("Preparing…");
+            statusView.setText("准备中…");
             logView.setText("");  // clear log on new selection
         });
         String fileName = uri.getLastPathSegment();
-        appendLog("=== Boot Image Check started ===");
-        appendLog("File: " + (fileName != null ? fileName : "(unknown)"));
+        appendLog("=== 开始检查 boot.img ===");
+        appendLog("文件：" + (fileName != null ? fileName : "(未知)"));
 
         new Thread(() -> {
             try {
@@ -125,7 +125,7 @@ public class BootimgCheckerActivity extends Activity {
                     if (pageSize == 0) pageSize = 4096;
                     int kernelOff = pageSize;
                     if (kernelSize <= 0 || kernelSize > 200_000_000) {
-                        throw new IOException("Invalid kernel size: " + kernelSize);
+                        throw new IOException("内核尺寸异常：" + kernelSize);
                     }
                     appendLog("kernel_size=" + kernelSize + " page_size=" + pageSize);
 
@@ -144,15 +144,15 @@ public class BootimgCheckerActivity extends Activity {
                     if (kernel.length >= 2 && kernel[0] == 0x1f && kernel[1] == 0x8b) {
                         updateProgress(60, "Decompressing gzip kernel…");
                         kernel = decompressGzip(kernel);
-                        appendLog("decompressed gzip -> " + kernel.length + " bytes");
+                        appendLog("gzip 解压 → " + kernel.length + " 字节");
                     } else if (kernel.length >= 6
                             && kernel[0] == (byte)0xfd && kernel[1] == '7' && kernel[2] == 'z'
                             && kernel[3] == 'X' && kernel[4] == 'Z' && kernel[5] == 0) {
                         updateProgress(60, "Decompressing xz kernel…");
                         kernel = decompressXz(kernel);
-                        appendLog("decompressed xz -> " + kernel.length + " bytes");
+                        appendLog("xz 解压 → " + kernel.length + " 字节");
                     } else {
-                        appendLog("raw Image (magic " + String.format("%02x%02x", kernel[0] & 0xff, kernel[1] & 0xff) + ")");
+                        appendLog("未压缩 Image（magic " + String.format("%02x%02x", kernel[0] & 0xff, kernel[1] & 0xff) + ")");
                     }
                     // Extract kernel version string from the image
                     String kver = extractKernelVersion(kernel);
@@ -176,18 +176,18 @@ public class BootimgCheckerActivity extends Activity {
                         if (ok_a16 || ok_a17) {
                             String type = ok_a17 ? "A17 (A171WWH.42-35-16)"
                                                  : "A16 (W3WWL36.65-48-7)";
-                            statusView.setText("✓ PASS — " + type);
-                            appendLog("RESULT: ✓ PASS — " + type + " call sites match the exploit offsets");
+                            statusView.setText("✓ 通过 — " + type);
+                            appendLog("结果：✓ 通过 — " + type + " 的 call site 与 exploit 偏移一致");
                         } else {
-                            statusView.setText("✗ FAIL — offsets do not match");
-                            appendLog("RESULT: ✗ FAIL — call site mismatch (new offsets needed)");
+                            statusView.setText("✗ 失败 — 偏移不匹配");
+                            appendLog("结果：✗ 失败 — call site 不匹配（需要重新提取偏移）");
                         }
                     });
                 }
             } catch (Throwable t) {
                 ui.post(() -> {
-                    statusView.setText("Error: " + t.getMessage());
-                    appendLog("ERROR: " + t);
+                    statusView.setText("错误：" + t.getMessage());
+                    appendLog("错误：" + t);
                 });
             } finally {
                 checking = false;
@@ -222,13 +222,13 @@ public class BootimgCheckerActivity extends Activity {
         long fileOff = retVaddr - RELATIVE_BASE;
         long blFile = fileOff - 4;
         if (blFile < 0 || blFile + 4 > kernel.length) {
-            appendLog("[" + name + "] OUT OF RANGE");
+            appendLog("[" + name + "] 超出范围");
             return false;
         }
         int insn = readU32(kernel, (int)blFile);
         // bl encoding: top 6 bits = 0b100101 (0x25). Use >>> (unsigned).
         if ((insn >>> 26) != 0x25) {
-            appendLog("[" + name + "] NOT A BL at file " + Long.toHexString(blFile) + ": " + String.format("%08x", insn));
+            appendLog("[" + name + "] 此处不是 BL 指令，偏移 " + Long.toHexString(blFile) + ": " + String.format("%08x", insn));
             return false;
         }
         int imm26 = insn & 0x3ffffff;
@@ -236,8 +236,8 @@ public class BootimgCheckerActivity extends Activity {
         long blVaddr = retVaddr - 4;
         long target = blVaddr + (imm26 << 2);
         boolean ok = (0xffffffc000000000L <= target && target <= 0xffffffff00000000L);
-        appendLog("[" + name + "] bl at vaddr " + Long.toHexString(blVaddr)
-                + " -> target " + Long.toHexString(target) + " " + (ok ? "OK" : "BAD"));
+        appendLog("[" + name + "] BL 位于 " + Long.toHexString(blVaddr)
+                + " -> target " + Long.toHexString(target) + " " + (ok ? "正常" : "异常"));
         return ok;
     }
 

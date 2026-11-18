@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AVR Root</string>
+    <string name="subtitle">One-tap temporary root for Lenovo Y70 / moto edge 70 max</string>
+
+    <string name="section_device_check">DEVICE CHECK</string>
+    <string name="section_root_manager">ROOT MANAGER</string>
+    <string name="manager_desc">Choose your installed manager. Custom lets you enter a spoofed package name.</string>
+    <string name="hint_pkg_example">me.weishu.kernelsu</string>
+    <string name="btn_request_shizuku">REQUEST SHIZUKU ACCESS</string>
+    <string name="btn_shizuku_granted">SHIZUKU ACCESS GRANTED</string>
+    <string name="btn_root">ROOT THIS BOOT</string>
+    <string name="btn_running">RUNNING… (reboot if stuck)</string>
+    <string name="btn_soft_reboot">SOFT REBOOT (via manager)</string>
+    <string name="btn_reboot">REBOOT</string>
+    <string name="btn_shutdown">SHUTDOWN</string>
+    <string name="tip_cold_boot">Tip: a cold boot helps - power off ~2 min, then turn on, for the best success rate.</string>
+    <string name="footer_note">Requires Shizuku - reboot and retry after a failed reclaim</string>
+    <string name="btn_open_checker">OPEN BOOT IMAGE CHECKER</string>
+    <string name="label_run_log">RUN LOG</string>
+    <string name="btn_copy">COPY</string>
+    <string name="btn_clear">CLEAR</string>
+
+    <string name="checker_title">Boot Image Checker</string>
+    <string name="checker_subtitle">Verify exploit offsets against a boot.img</string>
+    <string name="checker_desc">Load a boot.img to verify if the current exploit offsets match. Safe, read-only, takes ~10s. Does not affect the running kernel.</string>
+    <string name="btn_select_bootimg">SELECT BOOT.IMG</string>
+    <string name="label_check_log">CHECK LOG</string>
+    <string name="btn_close">CLOSE</string>
+</resources>

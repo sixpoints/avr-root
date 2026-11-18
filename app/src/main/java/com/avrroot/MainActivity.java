@@ -128,18 +128,18 @@ public class MainActivity extends Activity {
 
         refreshStatus();
         if (deviceStatus() != 0) {
-            appendLog("Note: this build is not verified (target: avr / XT2611, "
-                    + "builds W3WWL36.65-48-7 or A171WWH.42-35-16). Running may "
-                    + "fail or crash the kernel — proceed at your own risk.");
+            appendLog("注意：本机版本不在已验证列表（适配目标是 avr / XT2611，"
+                    + "版本 W3WWL36.65-48-7 或 A171WWH.42-35-16）。执行可能失败"
+                    + "甚至把内核搞崩 —— 风险自负。");
         }
         int km = kernelMatch();
         if (km == 1) {
-            appendLog("⚠ KERNEL MISMATCH: payload was built for " + expectedKernel()
-                    + " but this device is running " + kernelVersion()
-                    + ". The exploit offsets will not line up. Do not run — "
-                    + "extract this build's offsets first (see exploit/src/devices).");
+            appendLog("⚠ 内核不匹配：载荷是按 " + expectedKernel()
+                    + " 编译的，而本机运行的是 " + kernelVersion()
+                    + "。偏移对不上，请勿执行 —— 先提取该版本的偏移"
+                    + "（见 exploit/src/devices）。");
         } else if (km == 0) {
-            appendLog("kernel matches payload offsets (" + kernelVersion() + ")");
+            appendLog("内核与载荷偏移匹配（" + kernelVersion() + "）");
         }
     }
 
@@ -279,7 +279,7 @@ public class MainActivity extends Activity {
     }
 
     /** 用于显示的 build 串（优先命中已适配 build id 的那个）。 */
-    private String xiaomiBuild() {
+    private String deviceBuild() {
         for (String want : EXPECT_BUILDS) {
             for (String s : buildSources()) {
                 if (s != null && s.contains(want)) {
@@ -356,7 +356,7 @@ public class MainActivity extends Activity {
 
     private void refreshStatus() {
         String dev = android.os.Build.DEVICE;
-        String build = xiaomiBuild();
+        String build = deviceBuild();
         String kernel = kernelVersion();
         int st = deviceStatus();
 
@@ -364,20 +364,20 @@ public class MainActivity extends Activity {
         boolean shizukuReady = false;
         try {
             if (!Shizuku.pingBinder()) {
-                shizuku = "Shizuku: not running (open Shizuku, then return here)";
+                shizuku = "Shizuku：未运行（先打开 Shizuku 再回来）";
             } else if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                shizuku = "Shizuku: ready";
+                shizuku = "Shizuku：就绪";
                 shizukuReady = true;
             } else {
-                shizuku = "Shizuku: permission not granted (tap Request Access)";
+                shizuku = "Shizuku：未授权（点“申请授权”）";
             }
         } catch (Throwable t) {
-            shizuku = "Shizuku: unavailable (" + t.getClass().getSimpleName() + ")";
+            shizuku = "Shizuku：不可用 (" + t.getClass().getSimpleName() + ")";
         }
 
-        String target = st == 0 ? "VERIFIED BUILD (avr / XT2611)"
-                : st == 1 ? "EXPERIMENTAL (avr, build not in the adapted list)"
-                : "UNSUPPORTED (not an avr device)";
+        String target = st == 0 ? "已验证机型 / 版本（avr / XT2611）"
+                : st == 1 ? "试验态（avr，但版本不在适配列表）"
+                : "不支持（非 avr 机型）";
         boolean ksuLoaded = isKsuLoaded();
         if (ksuLoaded) {
             rooted = true;
@@ -385,37 +385,36 @@ public class MainActivity extends Activity {
         }
         String rootState;
         if (!rootChecked) {
-            rootState = "root: checking…";
+            rootState = "root：检查中…";
         } else {
-            rootState = rooted ? "ROOTED (KernelSU loaded)" : "not rooted";
+            rootState = rooted ? "已 root（KernelSU 已加载）" : "未 root";
         }
         String payloadLine;
         int km = kernelMatch();
         if (km == 0) {
-            payloadLine = "Payload   " + expectedKernel() + "\n"
-                    + "          ✓ kernel matches payload offsets";
+            payloadLine = "载荷     " + expectedKernel() + "\n"
+                    + "          ✓ 内核与载荷偏移匹配";
         } else if (km == 1) {
-            payloadLine = "Payload   " + expectedKernel() + "\n"
-                    + "          ⚠ KERNEL MISMATCH — payload offsets are for a "
-                    + "different kernel\n"
-                    + "          Device   " + kernel + " (do not run)";
+            payloadLine = "载荷     " + expectedKernel() + "\n"
+                    + "          ⚠ 内核不匹配 —— 载荷偏移是给另一个内核编的\n"
+                    + "          本机内核 " + kernel + "（请勿执行）";
         } else {
-            payloadLine = "Payload   " + expectedKernel() + "\n"
-                    + "          ? could not read device kernel";
+            payloadLine = "载荷     " + expectedKernel() + "\n"
+                    + "          ? 读不到设备内核版本";
         }
 
         statusView.setHorizontallyScrolling(false);
         statusView.setSingleLine(false);
         statusView.setText(
                 target + "\n"
-                        + "Device   " + dev + "\n"
-                        + "Target   Xiaomi 17 / HyperOS 4\n"
-                        + "Build    " + build + "\n"
+                        + "设备     " + dev + "\n"
+                        + "适配机型 avr / XT2611\n"
+                        + "版本     " + build + "\n"
                         + payloadLine + "\n"
                         + rootState + "\n"
                         + shizuku);
-        shizukuBtn.setText(shizukuReady ? "SHIZUKU ACCESS GRANTED" : "REQUEST SHIZUKU ACCESS");
-        rootBtn.setText(running ? "RUNNING… (reboot if stuck)" : "ROOT THIS BOOT");
+        shizukuBtn.setText(shizukuReady ? R.string.btn_shizuku_granted : R.string.btn_request_shizuku);
+        rootBtn.setText(running ? R.string.btn_running : R.string.btn_root);
         rootBtn.setEnabled(shizukuReady && !running);
         rebootBtn.setEnabled(shizukuReady);
         shutdownBtn.setEnabled(shizukuReady);
@@ -437,9 +436,9 @@ public class MainActivity extends Activity {
         java.util.Set<String> installed = installedPackages();
         ArrayList<String> labels = new ArrayList<>();
         ArrayList<String> packages = new ArrayList<>();
-        addManagerIfInstalled(labels, packages, installed, CURRENT_SPOOF, "KernelSU Next (spoofed)");
-        addManagerIfInstalled(labels, packages, installed, "me.weishu.kernelsu", "KernelSU (stock)");
-        addManagerIfInstalled(labels, packages, installed, "com.rifsxd.ksunext", "KernelSU Next (stock)");
+        addManagerIfInstalled(labels, packages, installed, CURRENT_SPOOF, "KernelSU Next（已改名）");
+        addManagerIfInstalled(labels, packages, installed, "me.weishu.kernelsu", "KernelSU（原版）");
+        addManagerIfInstalled(labels, packages, installed, "com.rifsxd.ksunext", "KernelSU Next（原版）");
         addManagerIfInstalled(labels, packages, installed, "com.sukisu.ultra", "SukiSU Ultra");
         addManagerIfInstalled(labels, packages, installed, "com.resukisu.resukisu", "ReSukiSU");
         // Any other installed package whose name looks like a KSU manager.
@@ -451,8 +450,8 @@ public class MainActivity extends Activity {
                 packages.add(p);
             }
         }
-        appendLog("managers detected: " + packages);
-        labels.add("Custom package");
+        appendLog("检测到的管理器: " + packages);
+        labels.add("自定义包名");
         packages.add("");
         managerLabels = labels.toArray(new String[0]);
         managerPackages = packages.toArray(new String[0]);
@@ -504,7 +503,7 @@ public class MainActivity extends Activity {
     private void requestShizuku() {
         try {
             if (!Shizuku.pingBinder()) {
-                toast("Start Shizuku first, then return here");
+                toast("请先启动 Shizuku，再回到本页");
                 try {
                     android.content.Intent intent = getPackageManager().getLaunchIntentForPackage(
                             "moe.shizuku.privileged.api");
@@ -520,11 +519,11 @@ public class MainActivity extends Activity {
                 ui.postDelayed(this::refreshStatus, 500);
                 ui.postDelayed(this::refreshStatus, 1500);
             } else {
-                toast("Shizuku access is already granted");
+                toast("Shizuku 权限已授予");
                 refreshStatus();
             }
         } catch (Throwable t) {
-            toast("Shizuku error: " + t.getClass().getSimpleName());
+            toast("Shizuku 异常：" + t.getClass().getSimpleName());
         }
     }
 
@@ -534,11 +533,11 @@ public class MainActivity extends Activity {
         }
         if (rooted) {
             new AlertDialog.Builder(this)
-                    .setTitle("Already rooted")
-                    .setMessage("KernelSU is already loaded. Re-running the exploit is "
-                            + "usually unnecessary and can crash the kernel. Continue anyway?")
-                    .setPositiveButton("Continue", (d, w) -> runRoot())
-                    .setNegativeButton("Cancel", null)
+                    .setTitle("已经 root 了")
+                    .setMessage("KernelSU 已加载。重复执行通常没必要，"
+                            + "还可能把内核搞崩。仍要继续吗？")
+                    .setPositiveButton("继续", (d, w) -> runRoot())
+                    .setNegativeButton("取消", null)
                     .show();
             return;
         }
@@ -551,33 +550,33 @@ public class MainActivity extends Activity {
         }
         String pkg = pkgEdit.getText().toString().trim();
         if (pkg.isEmpty()) {
-            toast("Select or enter a KernelSU manager package first");
+            toast("请先选择或填写 KernelSU 系管理器的包名");
             return;
         }
         // Package names are only [a-zA-Z0-9.]. Reject anything else up front so
         // the value can never be interpolated into a shell command as code.
         if (!pkg.matches("[a-zA-Z0-9.]+")) {
-            toast("Invalid package name: " + pkg);
+            toast("包名不合法：" + pkg);
             return;
         }
         if (!packageInstalled(pkg)) {
             new AlertDialog.Builder(this)
-                    .setTitle("Manager not installed")
-                    .setMessage("'" + pkg + "' is not installed. Install a KernelSU-family "
-                            + "manager (KernelSU / KernelSU-Next / SukiSU / ReSukiSU) first, "
-                            + "or pick the right one above.")
-                    .setPositiveButton("OK", null)
+                    .setTitle("管理器未安装")
+                    .setMessage("'" + pkg + "' 未安装。请先安装 KernelSU 系的管理器"
+                            + "（KernelSU / KernelSU-Next / SukiSU / ReSukiSU），"
+                            + "或在上方重新选择。")
+                    .setPositiveButton("确定", null)
                     .show();
             return;
         }
         try {
             if (!Shizuku.pingBinder()
                     || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                toast("Grant Shizuku access first");
+                toast("请先授予 Shizuku 权限");
                 return;
             }
         } catch (Throwable t) {
-            toast("Shizuku error: " + t);
+            toast("Shizuku 异常：" + t);
             return;
         }
 
@@ -585,8 +584,8 @@ public class MainActivity extends Activity {
 
         running = true;
         rootBtn.setEnabled(false);
-        rootBtn.setText("RUNNING… (reboot if stuck)");
-        appendLog("=== starting · KSU package: " + pkg + " ===");
+        rootBtn.setText(R.string.btn_running);
+        appendLog("=== 开始 · KSU 包名: " + pkg + " ===");
 
         final String finalPkg = pkg;
         new Thread(new RootRunner(this, finalPkg, new RootRunner.Sink() {
@@ -598,8 +597,8 @@ public class MainActivity extends Activity {
             @Override
             public void onDone(boolean ok, String summary) {
                 Notifier.notify(MainActivity.this,
-                        ok ? "AvrRoot: rooted" : "AvrRoot: failed",
-                        ok ? summary : summary + " Reboot and retry.",
+                        ok ? "AvrRoot：已 root" : "AvrRoot：失败",
+                        ok ? summary : summary + " 请重启后重试。",
                         Notifier.ID_AUTO);
                 ui.post(() -> {
                     appendLog(summary);
@@ -622,8 +621,8 @@ public class MainActivity extends Activity {
 
     private void copyLog() {
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(ClipData.newPlainText("AvrRoot log", logView.getText()));
-        toast("Log copied");
+        clipboard.setPrimaryClip(ClipData.newPlainText("AvrRoot 日志", logView.getText()));
+        toast("日志已复制");
     }
 
     private void clearLog() {
@@ -633,22 +632,22 @@ public class MainActivity extends Activity {
 
     private void rebootDevice() {
         issuePowerCommand("svc power reboot 2>&1 || setprop sys.powerctl reboot 2>&1",
-                "Reboot", "Rebooting…", "reboot");
+                "重启", "正在重启…", "reboot");
     }
 
     private void shutdownDevice() {
-        // HyperOS maps `svc power shutdown` to a quick shutdown that reboots
-        // right after turning off. Use the raw init power-off instead (like the
-        // power button); it needs root, so try setprop first, then reboot -p.
+        // 部分国产 ROM 把 `svc power shutdown` 映射成“快速关机”（关完立刻重启），
+        // 这里改成直接切 init 的 powerctl（等同长按电源键关机）；
+        // 需要 root，所以先试 setprop，不行再 reboot -p。
         issuePowerCommand(
                 "/system/bin/su -c 'setprop sys.powerctl shutdown' 2>&1 "
                         + "|| /system/bin/su -c 'reboot -p' 2>&1",
-                "Shutdown", "Shutting down…", "shutdown");
+                "关机", "正在关机…", "shutdown");
     }
 
     private void softRebootDevice() {
         if (!rooted) {
-            toast("Root first, then soft reboot");
+            toast("请先提权，再用软重启");
             return;
         }
         // This ROM doesn't support userspace reboot, so hand off to the
@@ -662,12 +661,12 @@ public class MainActivity extends Activity {
             if (intent != null) {
                 intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
-                appendLog("opened manager (" + pkg + ") — use its soft reboot");
+                appendLog("已打开管理器（" + pkg + "）—— 用它的软重启");
             } else {
-                toast("Manager not found: " + pkg);
+                toast("找不到管理器：" + pkg);
             }
         } catch (Throwable t) {
-            toast("Can't open manager: " + t.getClass().getSimpleName());
+            toast("无法打开管理器：" + t.getClass().getSimpleName());
         }
     }
 
@@ -675,15 +674,15 @@ public class MainActivity extends Activity {
         try {
             if (!Shizuku.pingBinder()
                     || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                toast("Grant Shizuku access first");
+                toast("请先授予 Shizuku 权限");
                 return;
             }
         } catch (Throwable t) {
-            toast("Shizuku error: " + t.getClass().getSimpleName());
+            toast("Shizuku 异常：" + t.getClass().getSimpleName());
             return;
         }
         toast(toastMsg);
-        appendLog("--- " + logLabel + " requested ---");
+        appendLog("--- 已请求" + logLabel + " ---");
         new Thread(() -> {
             String out = RootRunner.runShizukuCommand(command);
             String o = out == null ? "" : out.trim();

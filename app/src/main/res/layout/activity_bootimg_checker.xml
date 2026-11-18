@@ -24,7 +24,7 @@
             <ImageView
                 android:layout_width="48dp"
                 android:layout_height="48dp"
-                android:contentDescription="Boot Image Checker"
+                android:contentDescription="@string/checker_title"
                 android:src="@drawable/ic_launcher" />
 
             <LinearLayout
@@ -37,7 +37,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Boot Image Checker"
+                    android:text="@string/checker_title"
                     android:textColor="#FFF7E8"
                     android:textSize="26sp"
                     android:textStyle="bold" />
@@ -45,7 +45,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Verify exploit offsets against a boot.img"
+                    android:text="@string/checker_subtitle"
                     android:textColor="#8F9AA8"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -56,7 +56,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:text="Load a boot.img to verify if the current exploit offsets match. Safe, read-only, takes ~10s. Does not affect the running kernel."
+            android:text="@string/checker_desc"
             android:textColor="#8F9AA8"
             android:textSize="12sp" />
 
@@ -67,7 +67,7 @@
             android:layout_height="44dp"
             android:layout_marginTop="14dp"
             android:backgroundTint="#293240"
-            android:text="SELECT BOOT.IMG"
+            android:text="@string/btn_select_bootimg"
             android:textAllCaps="false"
             android:textColor="#E8EDF4"
             android:textSize="13sp" />
@@ -107,7 +107,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="CHECK LOG"
+                android:text="@string/label_check_log"
                 android:textColor="#F3BE62"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -118,7 +118,7 @@
                 android:layout_height="32dp"
                 android:layout_marginStart="8dp"
                 android:backgroundTint="#293240"
-                android:text="COPY"
+                android:text="@string/btn_copy"
                 android:textAllCaps="false"
                 android:textColor="#E8EDF4"
                 android:textSize="11sp" />
@@ -129,7 +129,7 @@
                 android:layout_height="32dp"
                 android:layout_marginStart="4dp"
                 android:backgroundTint="#293240"
-                android:text="CLEAR"
+                android:text="@string/btn_clear"
                 android:textAllCaps="false"
                 android:textColor="#E8EDF4"
                 android:textSize="11sp" />
@@ -155,7 +155,7 @@
             android:layout_height="44dp"
             android:layout_marginTop="16dp"
             android:backgroundTint="#293240"
-            android:text="CLOSE"
+            android:text="@string/btn_close"
             android:textAllCaps="false"
             android:textColor="#E8EDF4"
             android:textSize="13sp" />

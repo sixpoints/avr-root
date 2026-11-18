@@ -70,6 +70,12 @@ PowerShell 同理，用双引号或直接不加引号。
 
 ---
 
+## 界面语言
+
+默认**中文**（`res/values/strings.xml`），英文机自动走 `res/values-en/strings.xml`。
+所有静态文案都走 `@string/...`；运行时日志（`appendLog`）也是中文。
+想改文案只改这两个文件，不用碰布局。
+
 ## 用法
 
 1. 装一个自带 `libksud.so` 的 root 管理器（KernelSU / KernelSU-Next / SukiSU Ultra /

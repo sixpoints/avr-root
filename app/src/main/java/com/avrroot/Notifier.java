@@ -20,7 +20,7 @@ public final class Notifier {
     public static void ensureChannel(Context ctx) {
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
         NotificationChannel ch = new NotificationChannel(
-                CHANNEL, "AvrRoot", NotificationManager.IMPORTANCE_HIGH);
+                CHANNEL, "AvrRoot 提权通知", NotificationManager.IMPORTANCE_HIGH);
         nm.createNotificationChannel(ch);
     }
 
