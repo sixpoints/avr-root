@@ -103,59 +103,75 @@ public class RootRunner implements Runnable {
      *
      * @return null = 通过；否则是失败原因
      */
+    /**
+     * 环境自检：把 exploit 依赖的每一项都真跑一遍，并把 **stderr 一起收回来**。
+     *
+     * 只做诊断、不再硬拦 —— 自检失败时 run() 会打警告然后照样尝试，
+     * 因为失败原因可能是"当前状态不允许"而不是"永远不允许"。
+     *
+     * @return 多行报告；第一行以 "OK" 或 "FAIL" 开头
+     */
     private String preflight() {
-        String r;
+        StringBuilder sb = new StringBuilder();
+        boolean ok = true;
 
-        r = sh("head -1 /proc/slabinfo >/dev/null 2>&1 && echo S_OK || echo S_FAIL");
-        if (!r.contains("S_OK")) {
-            return "读不到 /proc/slabinfo（SELinux 或权限限制）";
-        }
+        // 身份 / 域：Shizuku 拉起的进程与 adb shell 可能不是同一个 SELinux 域
+        String ident = sh("exec 2>&1; id; echo ---; id -Z; echo ---; getenforce").trim();
+        sb.append("id: ").append(ident.replace("\n", " | ")).append('\n');
 
-        // 关键一条：exploit 靠 events/kmem/rss_stat/trigger 打开 kmem 事件。
-        // 先 arm 再立刻 disarm，测完不留副作用。
-        r = sh("T=/sys/kernel/tracing/events/kmem/rss_stat/trigger; "
-                + "echo enable_event:kmem:kmem_cache_alloc > $T 2>/dev/null "
-                + "&& echo disable_event:kmem:kmem_cache_alloc > $T 2>/dev/null "
-                + "&& echo G_OK || echo G_FAIL");
-        if (!r.contains("G_OK")) {
-            return "写不进 events/kmem/rss_stat/trigger —— shell 没有 tracefs 写权限"
-                    + "（通常只有 readtracefs 只读组），本 exploit 无法运行";
-        }
+        // 1) slabinfo
+        String r = sh("exec 2>&1; head -1 /proc/slabinfo");
+        boolean b1 = r.contains("slabinfo - version");
+        ok &= b1;
+        sb.append(b1 ? "  ✓ slabinfo 可读" : "  ✗ slabinfo 失败: " + r.trim()).append('\n');
 
-        // 清 trace 缓冲（exploit 的 trace_start() 也会做），顺带验证 /trace 可写
-        r = sh("echo > /sys/kernel/tracing/trace 2>/dev/null && echo C_OK || echo C_FAIL");
-        if (!r.contains("C_OK")) {
-            return "写不进 /sys/kernel/tracing/trace（清缓冲失败）";
-        }
+        // 2) 关键：events/kmem/rss_stat/trigger 可写（arm 后立刻 disarm）
+        r = sh("exec 2>&1; T=/sys/kernel/tracing/events/kmem/rss_stat/trigger; "
+                + "echo enable_event:kmem:kmem_cache_alloc > $T; rc=$?; "
+                + "echo disable_event:kmem:kmem_cache_alloc > $T; rc2=$?; "
+                + "echo RC=$rc/$rc2");
+        boolean b2 = r.contains("RC=0/0");
+        ok &= b2;
+        sb.append(b2 ? "  ✓ rss_stat/trigger 可写"
+                     : "  ✗ rss_stat/trigger 失败: " + r.trim().replace("\n", " | ")).append('\n');
 
-        // tracing_on 写入当前值：幂等
-        r = sh("v=$(cat /sys/kernel/tracing/tracing_on 2>/dev/null); "
-                + "echo $v > /sys/kernel/tracing/tracing_on 2>/dev/null "
-                + "&& echo T_OK || echo T_FAIL");
-        if (!r.contains("T_OK")) {
-            return "没有 tracefs 写权限（tracing_on 写不进去）";
-        }
+        // 3) /trace 可写（清缓冲）
+        r = sh("exec 2>&1; echo > /sys/kernel/tracing/trace; echo RC=$?");
+        boolean b3 = r.contains("RC=0");
+        ok &= b3;
+        sb.append(b3 ? "  ✓ trace 可写" : "  ✗ trace 失败: " + r.trim().replace("\n", " | ")).append('\n');
 
-        // 读 trace_pipe_raw 0 字节：只探测可读性，不消费数据
-        r = sh("head -c 0 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw "
-                + ">/dev/null 2>&1 && echo R_OK || echo R_FAIL");
-        if (!r.contains("R_OK")) {
-            return "读不到 per_cpu/cpu0/trace_pipe_raw（tracefs 只读面也不完整）";
-        }
+        // 4) tracing_on 可写（写回当前值）
+        r = sh("exec 2>&1; v=$(cat /sys/kernel/tracing/tracing_on); "
+                + "echo $v > /sys/kernel/tracing/tracing_on; echo RC=$?");
+        boolean b4 = r.contains("RC=0");
+        ok &= b4;
+        sb.append(b4 ? "  ✓ tracing_on 可写"
+                     : "  ✗ tracing_on 失败: " + r.trim().replace("\n", " | ")).append('\n');
 
-        return null;
+        // 5) trace_pipe_raw 可读
+        r = sh("exec 2>&1; head -c 0 /sys/kernel/tracing/per_cpu/cpu0/trace_pipe_raw; echo RC=$?");
+        boolean b5 = r.contains("RC=0");
+        ok &= b5;
+        sb.append(b5 ? "  ✓ trace_pipe_raw 可读"
+                     : "  ✗ trace_pipe_raw 失败: " + r.trim().replace("\n", " | ")).append('\n');
+
+        return (ok ? "OK" : "FAIL") + "\n" + sb;
     }
 
     @Override
     public void run() {
         try {
-            String why = preflight();
-            if (why != null) {
-                sink.onLine("自检未通过：" + why);
-                sink.onDone(false, "环境不支持：" + why);
-                return;
+            String report = preflight();
+            for (String line : report.split("\n")) {
+                if (!line.isEmpty()) {
+                    sink.onLine("自检 " + line);
+                }
             }
-            sink.onLine("自检通过：slabinfo 可读 · tracefs 可写 · trace_pipe_raw 可读");
+            if (report.startsWith("FAIL")) {
+                sink.onLine("⚠ 自检未全部通过，仍继续尝试（失败就重启再来；"
+                        + "若多项失败请把上面的自检报告发出来）");
+            }
 
             String libName = payloadLib();
             String lib = ctx.getApplicationInfo().nativeLibraryDir + "/" + libName;
